@@ -8,6 +8,7 @@ import {
   resolveChannel,
 } from "../src/lib/channels.ts";
 import type { SlackClient } from "../src/lib/slack.ts";
+import { SlackApiError } from "../src/lib/slack.ts";
 import { readConfig, type StoredConfig } from "../src/lib/config.ts";
 
 function config(overrides: Partial<StoredConfig> = {}): StoredConfig {
@@ -21,14 +22,23 @@ function config(overrides: Partial<StoredConfig> = {}): StoredConfig {
   };
 }
 
-/** Stands in for SlackClient, recording the conversations.list calls made. */
-function fakeClient(pages: object[]): SlackClient & { calls: Record<string, string>[] } {
-  const calls: Record<string, string>[] = [];
+/** Stands in for SlackClient, recording the calls made. */
+function fakeClient(
+  pages: object[],
+  overrides: Record<string, object> = {},
+): SlackClient & { calls: Array<{ method: string; params: Record<string, string> }> } {
+  const calls: Array<{ method: string; params: Record<string, string> }> = [];
   let index = 0;
   return {
     calls,
-    async request(_method: string, params: Record<string, string> = {}) {
-      calls.push(params);
+    async request(method: string, params: Record<string, string> = {}) {
+      calls.push({ method, params });
+      const override = overrides[method];
+      if (override) {
+        const body = override as any;
+        if (body.__throw) throw body.__throw;
+        return body;
+      }
       return pages[Math.min(index++, pages.length - 1)] as any;
     },
   } as any;
@@ -96,13 +106,13 @@ describe("resolveChannel", () => {
     ]);
     expect(await resolveChannel(client, config(), "alerts")).toBe("C2");
     expect(client.calls).toHaveLength(2);
-    expect(client.calls[1]?.cursor).toBe("n1");
+    expect(client.calls[1]?.params.cursor).toBe("n1");
   });
 
   test("asks for private channels too", async () => {
     const client = fakeClient([{ ok: true, channels: [{ id: "C1", name: "alerts" }] }]);
     await resolveChannel(client, config(), "alerts");
-    expect(client.calls[0]?.types).toBe("public_channel,private_channel");
+    expect(client.calls[0]?.params.types).toBe("public_channel,private_channel");
   });
 
   test("fails with guidance when the channel is not visible", async () => {
@@ -110,5 +120,62 @@ describe("resolveChannel", () => {
     await expect(resolveChannel(client, config(), "missing")).rejects.toThrow(
       'No channel named "missing"',
     );
+  });
+
+  describe("on Enterprise Grid", () => {
+    // A Grid browser session is scoped to the org, so conversations.list is
+    // refused outright and the boot payload is the only route to a name.
+    const restricted = {
+      "conversations.list": { __throw: new SlackApiError("enterprise_is_restricted") },
+    };
+
+    test("falls back to the boot payload, including private channels", async () => {
+      const client = fakeClient([], {
+        ...restricted,
+        "client.userBoot": {
+          ok: true,
+          channels: [
+            { id: "C1", name: "general" },
+            { id: "C999", name: "rounders-cf", is_private: true },
+          ],
+        },
+      });
+      expect(await resolveChannel(client, config(), "#rounders-cf")).toBe("C999");
+      expect(client.calls.map((c) => c.method)).toEqual([
+        "conversations.list",
+        "client.userBoot",
+      ]);
+    });
+
+    test("caches the fallback result, so the restricted call is made once", async () => {
+      const stored = config();
+      const client = fakeClient([], {
+        ...restricted,
+        "client.userBoot": { ok: true, channels: [{ id: "C999", name: "alerts" }] },
+      });
+      await resolveChannel(client, stored, "alerts");
+      expect((await readConfig())?.channel_cache).toEqual({ alerts: "C999" });
+
+      const second = fakeClient([], restricted);
+      expect(await resolveChannel(second, stored, "alerts")).toBe("C999");
+      expect(second.calls).toHaveLength(0);
+    });
+
+    test("still reports an unknown channel clearly", async () => {
+      const client = fakeClient([], {
+        ...restricted,
+        "client.userBoot": { ok: true, channels: [{ id: "C1", name: "general" }] },
+      });
+      await expect(resolveChannel(client, config(), "missing")).rejects.toThrow(
+        'No channel named "missing"',
+      );
+    });
+
+    test("does not mask an unrelated Slack error", async () => {
+      const client = fakeClient([], {
+        "conversations.list": { __throw: new SlackApiError("ratelimited") },
+      });
+      await expect(resolveChannel(client, config(), "alerts")).rejects.toThrow("ratelimited");
+    });
   });
 });

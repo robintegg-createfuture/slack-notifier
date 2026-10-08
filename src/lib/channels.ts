@@ -1,6 +1,15 @@
-import type { SlackClient } from "./slack.ts";
+import { SlackApiError, type SlackClient } from "./slack.ts";
 import type { StoredConfig } from "./config.ts";
 import { writeConfig } from "./config.ts";
+
+/**
+ * Slack's refusal to run a workspace-level method with an org-level token.
+ *
+ * On Enterprise Grid the browser session is scoped to the org, so
+ * `conversations.list` is refused outright. Posting still works, so only the
+ * name lookup needs another route.
+ */
+const RESTRICTED_ON_GRID = new Set(["enterprise_is_restricted", "not_allowed_token_type"]);
 
 /** Accepts `#alerts`, `alerts`, a channel ID, or a Slack channel link. */
 export function normaliseChannelInput(input: string): string {
@@ -45,7 +54,29 @@ export async function resolveChannel(
   return id;
 }
 
+/**
+ * Find a channel ID by name, by whichever route this account is allowed.
+ *
+ * `conversations.list` is the complete answer and is tried first. An Enterprise
+ * Grid session cannot call it at all, so that case falls back to the channels
+ * the client boot payload reports — the ones the user is a member of, which is
+ * what a notifier posts to anyway.
+ */
 async function lookupChannelId(client: SlackClient, name: string): Promise<string | null> {
+  try {
+    return await lookupViaConversationsList(client, name);
+  } catch (err) {
+    if (err instanceof SlackApiError && RESTRICTED_ON_GRID.has(err.code)) {
+      return await lookupViaUserBoot(client, name);
+    }
+    throw err;
+  }
+}
+
+async function lookupViaConversationsList(
+  client: SlackClient,
+  name: string,
+): Promise<string | null> {
   const wanted = name.toLowerCase();
   let cursor = "";
 
@@ -67,5 +98,15 @@ async function lookupChannelId(client: SlackClient, name: string): Promise<strin
     cursor = metadata?.next_cursor ?? "";
   } while (cursor);
 
+  return null;
+}
+
+async function lookupViaUserBoot(client: SlackClient, name: string): Promise<string | null> {
+  const wanted = name.toLowerCase();
+  const body = await client.request("client.userBoot");
+  const channels = (body.channels ?? []) as Array<{ id?: string; name?: string }>;
+  for (const channel of channels) {
+    if (channel?.name?.toLowerCase() === wanted && channel.id) return channel.id;
+  }
   return null;
 }

@@ -14,7 +14,7 @@ const AUTH_ERROR_CODES = new Set([
  * one — is treated as a write, because a write that failed with a 5xx or a
  * network error may still have been applied and retrying could double-post.
  */
-const READ_METHODS = new Set(["auth.test", "conversations.list"]);
+const READ_METHODS = new Set(["auth.test", "conversations.list", "client.userBoot"]);
 
 const MAX_RETRIES = 3;
 const MAX_WAIT_MS = 60_000;

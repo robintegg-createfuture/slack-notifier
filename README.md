@@ -129,6 +129,21 @@ is installed — it drives the one you already have.
   could double-post. A rate limit (HTTP 429) *is* retried, since Slack rejected
   the call outright.
 
+## Enterprise Grid
+
+Grid works, with one wrinkle. A browser session on Grid is scoped to the **org**
+rather than to a workspace, so `conversations.list` is refused outright with
+`enterprise_is_restricted` — posting is fine, it is only looking a channel *name*
+up that Slack blocks.
+
+When that happens, the name is resolved from the client boot payload instead,
+which covers the channels you are a member of, including private ones. This is
+automatic; there is nothing to configure. Passing a channel ID or an archive
+link skips name resolution altogether.
+
+Requests go to the org host (`https://<org>.enterprise.slack.com`), which is
+what `auth.test` reports, and that is what `whoami` shows.
+
 ## Environment
 
 | Variable | Purpose |
