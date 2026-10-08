@@ -141,6 +141,39 @@ being documented, and the test suite fails if any command is missing a
 description, an example, an option description, a `--json` shape, or a fix for a
 documented error.
 
+### Install the agent skill
+
+Help only helps an agent that already knows this tool exists. The skill in
+[`skills/slack-notifier`](skills/slack-notifier/SKILL.md) is the part that
+makes an agent reach for it unprompted, and it ships the operating rules the
+CLI itself cannot enforce — confirm the channel and message before posting, and
+never retry a failed send.
+
+Install it from a checkout with the [`skills`](https://github.com/vercel-labs/skills)
+CLI:
+
+```bash
+npx skills add . -g                      # every detected agent, user-wide
+npx skills add . -g -a claude-code -y    # just one agent, no prompts
+npx skills add .                         # this project only
+```
+
+A global install puts the skill in the shared canonical directory
+`~/.agents/skills/slack-notifier` and symlinks the agents that use their own
+location. Agents reading the shared directory — GitHub Copilot and Codex among
+them — pick it up from there, so it is available in every project.
+
+> This repo has **no git remote**, so `npx skills add <owner>/slack-notifier`
+> cannot resolve. Install from a local path until it is pushed somewhere.
+
+Remove it again with `npx skills remove -g slack-notifier`.
+
+The skill deliberately does not restate the CLI's options or errors — it points
+at `slack-notifier help --json`, so there is one source of truth. A test parses
+`SKILL.md` and checks every `slack-notifier …` command and flag it mentions
+against the real specification, so the skill cannot drift without the suite
+going red.
+
 ## How the login works
 
 Slack's web client authenticates with a pair of credentials: an `xoxc-…` API
@@ -224,6 +257,7 @@ src/lib/capture.ts      pure extractors for the cookie and localConfig_v2
 src/lib/slack.ts        browser-auth request(), retry policy, error classes
 src/lib/channels.ts     channel name -> ID resolution and cache
 src/lib/config.ts       config storage and permissions
+skills/slack-notifier/  the installable agent skill
 ```
 
 Anything with a rule in it is pure and unit tested — the extractors run against
