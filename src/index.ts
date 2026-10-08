@@ -1,8 +1,16 @@
 #!/usr/bin/env bun
-import { parseArgs } from "./lib/args.ts";
+import { flagBoolean, parseArgs, type ParsedArgs } from "./lib/args.ts";
 import { login } from "./commands/login.ts";
 import { send } from "./commands/send.ts";
 import { logout, whoami } from "./commands/session.ts";
+import {
+  COMMANDS,
+  findCommand,
+  helpAsJson,
+  PROGRAM,
+  renderCommandHelp,
+  renderRootHelp,
+} from "./lib/help.ts";
 
 const ALIASES: Record<string, string> = {
   c: "channel",
@@ -10,67 +18,51 @@ const ALIASES: Record<string, string> = {
   h: "help",
 };
 
-const HELP = `slack-notifier — publish a notification to a named Slack channel.
+type Handler = (args: ParsedArgs) => Promise<number>;
 
-Usage:
-  slack-notifier login [--headless] [--workspace <name>] [--timeout <seconds>]
-  slack-notifier send --channel <name> [--message <text>] [--json]
-  slack-notifier whoami [--json]
-  slack-notifier logout [--keep-browser-session]
-
-Commands:
-  login     Sign in by capturing the tokens of a Slack session in your browser.
-            The first run opens a window and you sign in as you normally would;
-            the profile persists, so later runs can use --headless.
-  send      Post a message. --channel takes "#alerts", "alerts", a channel ID,
-            or a Slack archive link. With no --message, the message is read
-            from stdin.
-  whoami    Verify the stored credentials against Slack.
-  logout    Delete the stored credentials and the browser profile.
-
-Options:
-  -c, --channel <name>      Channel to post to.
-  -m, --message <text>      Message to post.
-      --workspace <name>    Pick a workspace when signed into several.
-      --headless            Sign in with no visible window (after a first login).
-      --timeout <seconds>   How long login waits for sign-in. Default 300.
-      --keep-browser-session  Leave the browser profile in place on logout.
-      --json                Machine-readable output for send and whoami.
-  -h, --help                Show this help.
-
-Environment:
-  SLACK_NOTIFIER_BROWSER      Path to a browser, if yours is not auto-detected.
-  SLACK_NOTIFIER_CONFIG_DIR   Override ~/.config/slack-notifier.
-
-Notes:
-  The browser profile is a credential store: while it exists, login can re-mint
-  working tokens with no prompt. Token values are never printed.
-
-Exit codes: 0 on success, 1 on any failure.
-`;
+const HANDLERS: Record<string, Handler> = { login, send, whoami, logout };
 
 async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2), ALIASES);
+  const json = flagBoolean(args.flags, "json");
 
-  if (args.flags.help === true || args.command === "help" || args.command === undefined) {
-    console.log(HELP);
-    return args.command === undefined && args.flags.help !== true ? 1 : 0;
+  // `help <command>` and `<command> --help` ask the same question.
+  if (args.command === "help") {
+    const topic = args.positional[0];
+    if (topic === undefined) {
+      console.log(json ? helpAsJson() : renderRootHelp());
+      return 0;
+    }
+    const spec = findCommand(topic);
+    if (!spec) return unknownCommand(topic);
+    console.log(json ? helpAsJson(spec) : renderCommandHelp(spec));
+    return 0;
   }
 
-  switch (args.command) {
-    case "login":
-      return await login(args);
-    case "send":
-      return await send(args);
-    case "whoami":
-      return await whoami(args);
-    case "logout":
-      return await logout(args);
-    default:
-      console.error(`Unknown command "${args.command}".`);
-      console.error('Run "slack-notifier --help" for usage.');
-      return 1;
+  if (args.command === undefined) {
+    // Nothing was asked for, so this is a usage error — but still print the
+    // help that says what to ask for.
+    const wantsHelp = flagBoolean(args.flags, "help");
+    console.log(json ? helpAsJson() : renderRootHelp());
+    return wantsHelp ? 0 : 1;
   }
+
+  const spec = findCommand(args.command);
+  if (!spec) return unknownCommand(args.command);
+
+  if (flagBoolean(args.flags, "help")) {
+    console.log(json ? helpAsJson(spec) : renderCommandHelp(spec));
+    return 0;
+  }
+
+  return await HANDLERS[spec.name]!(args);
+}
+
+function unknownCommand(name: string): number {
+  console.error(`Unknown command "${name}".`);
+  console.error(`Commands: ${COMMANDS.map((c) => c.name).join(", ")}.`);
+  console.error(`Run "${PROGRAM} --help" for usage.`);
+  return 1;
 }
 
 try {

@@ -48,6 +48,7 @@ slack-notifier login [--headless] [--workspace <name>] [--timeout <seconds>]
 slack-notifier send --channel <name> [--message <text>] [--json]
 slack-notifier whoami [--json]
 slack-notifier logout [--keep-browser-session]
+slack-notifier help [<command>] [--json]
 ```
 
 ### Sign in
@@ -85,6 +86,60 @@ resolved once and cached, so repeat notifications cost a single API call.
 
 Exit code is `0` on success and `1` on any failure, so it drops straight into a
 script.
+
+## Help, and using this from an agent
+
+Help is written for a caller that has nothing else to go on. Every command
+carries its own options, examples, `--json` shape, and the errors it can return
+with what to do about each:
+
+```bash
+slack-notifier --help            # every command, with a one-line summary
+slack-notifier send --help       # options, examples, JSON shape, errors
+slack-notifier help send         # the same thing
+```
+
+For a caller that would rather not parse prose, the whole specification is
+available as data:
+
+```bash
+slack-notifier help --json       # the whole CLI
+slack-notifier help send --json  # one command
+```
+
+```jsonc
+{
+  "program": "slack-notifier",
+  "commands": [
+    {
+      "name": "send",
+      "summary": "Post a message to a channel.",
+      "usage": "slack-notifier send --channel <name> [--message <text>] [--json]",
+      "options": [{ "name": "channel", "alias": "c", "required": true, "description": "…" }],
+      "examples": ["…"],
+      "jsonShape": { "ok": "boolean — …", "ts": "string — …" },
+      "errors": [{ "condition": "Not signed in", "fix": "Run slack-notifier login." }]
+    }
+  ],
+  "environment": [{ "name": "SLACK_NOTIFIER_BROWSER", "description": "…" }],
+  "exit_codes": { "0": "success", "1": "failure" }
+}
+```
+
+Three guarantees that make this safe to drive unattended:
+
+- **Streams are separated.** Human-readable output goes to stdout; progress and
+  errors go to stderr. With `--json`, stdout carries one JSON object and nothing
+  else — a failure exits `1` and writes nothing to stdout.
+- **A usage error names the help to read.** `slack-notifier send -m hi` prints
+  `(run "slack-notifier send --help" for usage and examples)`.
+- **`--help` never does anything.** `login --help` prints help without opening a
+  browser.
+
+The specification is also the dispatch table, so a command cannot exist without
+being documented, and the test suite fails if any command is missing a
+description, an example, an option description, a `--json` shape, or a fix for a
+documented error.
 
 ## How the login works
 
@@ -162,6 +217,7 @@ bun run build
 ```
 src/index.ts            argv parsing, command dispatch, exit codes
 src/commands/           login, send, whoami/logout
+src/lib/help.ts         the command specification, rendered as text or JSON
 src/lib/browser.ts      browser discovery, launch, CDP connection
 src/lib/auto-login.ts   capture policy: poll until credentials are readable
 src/lib/capture.ts      pure extractors for the cookie and localConfig_v2

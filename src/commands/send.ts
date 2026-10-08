@@ -2,6 +2,7 @@ import { readConfig } from "../lib/config.ts";
 import { SlackClient } from "../lib/slack.ts";
 import { resolveChannel } from "../lib/channels.ts";
 import { flagBoolean, flagString, type ParsedArgs } from "../lib/args.ts";
+import { usageHint } from "../lib/help.ts";
 
 export async function send(args: ParsedArgs): Promise<number> {
   const json = flagBoolean(args.flags, "json");
@@ -15,12 +16,14 @@ export async function send(args: ParsedArgs): Promise<number> {
   const channelInput = flagString(args.flags, "channel");
   if (!channelInput) {
     console.error("--channel is required.");
+    console.error(usageHint("send"));
     return 1;
   }
 
   const message = await resolveMessage(args);
   if (message === null) {
     console.error("--message is required, or pipe the message on stdin.");
+    console.error(usageHint("send"));
     return 1;
   }
 

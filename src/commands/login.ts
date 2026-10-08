@@ -3,6 +3,7 @@ import { captureSlackTokens } from "../lib/auto-login.ts";
 import { SlackClient } from "../lib/slack.ts";
 import { writeConfig, type StoredConfig } from "../lib/config.ts";
 import { flagBoolean, flagString, type ParsedArgs } from "../lib/args.ts";
+import { usageHint } from "../lib/help.ts";
 import type { CapturedWorkspace } from "../lib/capture.ts";
 
 const START_URL = "https://app.slack.com/client";
@@ -13,6 +14,7 @@ export async function login(args: ParsedArgs): Promise<number> {
   const timeoutSeconds = Number(flagString(args.flags, "timeout") ?? 300);
   if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
     console.error("--timeout must be a positive number of seconds.");
+    console.error(usageHint("login"));
     return 1;
   }
 
