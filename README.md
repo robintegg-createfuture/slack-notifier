@@ -29,7 +29,17 @@ bun install
 bun run build          # -> ./dist/slack-notifier
 ```
 
-Put `./dist/slack-notifier` somewhere on your `PATH`.
+The result is a single self-contained binary. Put it on your `PATH`:
+
+```bash
+mkdir -p ~/.local/bin
+ln -sf "$PWD/dist/slack-notifier" ~/.local/bin/slack-notifier
+```
+
+A symlink means a later `bun run build` updates the installed command too. Copy
+it instead if you would rather not depend on the checkout staying put.
+
+`dist/` is not committed, so a fresh clone needs `bun install && bun run build`.
 
 ## Usage
 
