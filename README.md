@@ -20,6 +20,30 @@ borrowed; the code is ours.
 **It has no runtime dependencies at all.** Bun's built-in `fetch`, `WebSocket`
 and `spawn` cover everything, so `bun install` installs only TypeScript types.
 
+## Quick install
+
+On macOS, download the latest self-contained binary and install the agent skill
+globally so GitHub Copilot can use it in any project:
+
+```bash
+case "$(uname -m)" in
+  arm64) asset="slack-notifier-darwin-arm64" ;;
+  x86_64) asset="slack-notifier-darwin-x64" ;;
+  *) echo "Unsupported Mac architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+
+mkdir -p "$HOME/.local/bin"
+curl -fL "https://github.com/robintegg-createfuture/slack-notifier/releases/latest/download/$asset" \
+  -o "$HOME/.local/bin/slack-notifier"
+chmod 755 "$HOME/.local/bin/slack-notifier"
+npx skills add robintegg-createfuture/slack-notifier --skill slack-notifier -g
+```
+
+Ensure `$HOME/.local/bin` is on your `PATH`, then sign in once with
+`slack-notifier login`. See [Install](#install) for PATH setup and
+[Install the agent skill](#install-the-agent-skill) for other installation
+options.
+
 ## Install
 
 Download the latest macOS release for your Mac. Prebuilt binaries are
