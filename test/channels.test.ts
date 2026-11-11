@@ -136,11 +136,11 @@ describe("resolveChannel", () => {
           ok: true,
           channels: [
             { id: "C1", name: "general" },
-            { id: "C999", name: "rounders-cf", is_private: true },
+            { id: "C999", name: "private-updates", is_private: true },
           ],
         },
       });
-      expect(await resolveChannel(client, config(), "#rounders-cf")).toBe("C999");
+      expect(await resolveChannel(client, config(), "#private-updates")).toBe("C999");
       expect(client.calls.map((c) => c.method)).toEqual([
         "conversations.list",
         "client.userBoot",
