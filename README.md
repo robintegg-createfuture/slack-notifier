@@ -22,24 +22,38 @@ and `spawn` cover everything, so `bun install` installs only TypeScript types.
 
 ## Install
 
-Requires [Bun](https://bun.sh) 1.4+.
+Download the latest macOS release for your Mac. Prebuilt binaries are
+self-contained; **Bun is not required**.
 
 ```bash
-bun install
-bun run build          # -> ./dist/slack-notifier
+case "$(uname -m)" in
+  arm64) asset="slack-notifier-darwin-arm64" ;; # Apple silicon
+  x86_64) asset="slack-notifier-darwin-x64" ;;  # Intel
+  *) echo "Unsupported Mac architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+
+mkdir -p "$HOME/.local/bin"
+curl -fL "https://github.com/robintegg-createfuture/slack-notifier/releases/latest/download/$asset" \
+  -o "$HOME/.local/bin/slack-notifier"
+chmod 755 "$HOME/.local/bin/slack-notifier"
 ```
 
-The result is a single self-contained binary. Put it on your `PATH`:
+Make sure `$HOME/.local/bin` is on your `PATH`. To keep it on `PATH` in zsh,
+add this line to `~/.zshrc`:
 
 ```bash
-mkdir -p ~/.local/bin
-ln -sf "$PWD/dist/slack-notifier" ~/.local/bin/slack-notifier
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-A symlink means a later `bun run build` updates the installed command too. Copy
-it instead if you would rather not depend on the checkout staying put.
+Open a new terminal, then check the installation:
 
-`dist/` is not committed, so a fresh clone needs `bun install && bun run build`.
+```bash
+slack-notifier --help
+```
+
+Each GitHub Release includes binaries for Apple silicon (`arm64`) and Intel
+(`x64`), plus `checksums.txt`. If no release is available yet, use the
+[build from source](#build-from-source) instructions below.
 
 ## Usage
 
@@ -246,6 +260,32 @@ bun test            # unit tests — no browser, no network
 bun run typecheck
 bun run build
 ```
+
+### Build from source
+
+Requires [Bun](https://bun.sh) 1.4+.
+
+```bash
+bun install
+bun run build          # -> ./dist/slack-notifier
+```
+
+The result is a self-contained binary for the current machine. Put it on your
+`PATH`:
+
+```bash
+mkdir -p ~/.local/bin
+ln -sf "$PWD/dist/slack-notifier" ~/.local/bin/slack-notifier
+```
+
+A symlink means a later `bun run build` updates the installed command too. Copy
+it instead if you would rather not depend on the checkout staying put.
+
+`dist/` is not committed, so a fresh clone needs `bun install && bun run build`.
+
+To publish a release, push a `v`-prefixed tag (for example, `v1.0.0`). GitHub
+Actions runs the tests and typecheck, then publishes the macOS binaries and
+checksums as release assets.
 
 ```
 src/index.ts            argv parsing, command dispatch, exit codes
