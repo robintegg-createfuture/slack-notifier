@@ -177,16 +177,17 @@ A global install puts the skill in the shared canonical directory
 location. Agents reading the shared directory — GitHub Copilot and Codex among
 them — pick it up from there, so it is available in every project.
 
-> This repo has **no git remote**, so `npx skills add <owner>/slack-notifier`
-> cannot resolve. Install from a local path until it is pushed somewhere.
+The repository also includes a [`tag-release`](skills/tag-release/SKILL.md)
+skill for creating the next numbered release tag from `origin/main`.
 
-Remove it again with `npx skills remove -g slack-notifier`.
+Remove either skill with `npx skills remove -g slack-notifier` or
+`npx skills remove -g tag-release`.
 
-The skill deliberately does not restate the CLI's options or errors — it points
-at `slack-notifier help --json`, so there is one source of truth. A test parses
-`SKILL.md` and checks every `slack-notifier …` command and flag it mentions
-against the real specification, so the skill cannot drift without the suite
-going red.
+The `slack-notifier` skill deliberately does not restate the CLI's options or
+errors — it points at `slack-notifier help --json`, so there is one source of
+truth. A test parses its `SKILL.md` and checks every `slack-notifier …` command
+and flag it mentions against the real specification, so the skill cannot drift
+without the suite going red.
 
 ## How the login works
 
@@ -283,9 +284,21 @@ it instead if you would rather not depend on the checkout staying put.
 
 `dist/` is not committed, so a fresh clone needs `bun install && bun run build`.
 
-To publish a release, push a `v`-prefixed tag (for example, `v1.0.0`). GitHub
-Actions runs the tests and typecheck, then publishes the macOS binaries and
-checksums as release assets.
+### Release
+
+Releases use whole-number tags only: `v1`, `v2`, `v3`, and so on. Do not use
+point releases such as `v1.0.0`. To create the next tag from the latest `main`:
+
+```bash
+git fetch origin
+git tag v1 origin/main
+git push origin v1
+```
+
+Replace `v1` with the next unused tag for each release, and use the same tag in
+both commands. Pushing the tag runs the release workflow, which tests and
+typechecks the code, then publishes the macOS binaries and checksums as a
+GitHub Release.
 
 ```
 src/index.ts            argv parsing, command dispatch, exit codes
