@@ -20,6 +20,12 @@ borrowed; the code is ours.
 **It has no runtime dependencies at all.** Bun's built-in `fetch`, `WebSocket`
 and `spawn` cover everything, so `bun install` installs only TypeScript types.
 
+## Quick install
+
+Use your agent to help you install with this prompt:
+
+> "Help me install the latest https://github.com/robintegg-createfuture/slack-notifier and also install the skill globally into my copilot skills folder"
+
 ## Install
 
 Download the latest macOS release for your Mac. Prebuilt binaries are
