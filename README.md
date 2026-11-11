@@ -163,13 +163,13 @@ makes an agent reach for it unprompted, and it ships the operating rules the
 CLI itself cannot enforce — confirm the channel and message before posting, and
 never retry a failed send.
 
-Install it from a checkout with the [`skills`](https://github.com/vercel-labs/skills)
+Install it from GitHub with the [`skills`](https://github.com/vercel-labs/skills)
 CLI:
 
 ```bash
-npx skills add . -g                      # every detected agent, user-wide
-npx skills add . -g -a claude-code -y    # just one agent, no prompts
-npx skills add .                         # this project only
+npx skills add robintegg-createfuture/slack-notifier --skill slack-notifier -g                      # every detected agent, user-wide
+npx skills add robintegg-createfuture/slack-notifier --skill slack-notifier -g -a claude-code -y    # just one agent, no prompts
+npx skills add robintegg-createfuture/slack-notifier --skill slack-notifier                         # this project only
 ```
 
 A global install puts the skill in the shared canonical directory
