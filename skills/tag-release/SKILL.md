@@ -7,7 +7,9 @@ description: Create the next whole-number Git tag for this repository's release 
 
 Create a release by pushing a new whole-number tag that points at the latest
 `origin/main`. The repository's release workflow runs on pushed `v*` tags and
-creates a GitHub Release with the macOS binaries and checksums.
+verifies and packages the Java application, then creates a GitHub Release
+with `slack-notifier.jar` and `checksums.txt`. Running the jar requires Java 21
+or later.
 
 1. Fetch the latest remote refs:
 

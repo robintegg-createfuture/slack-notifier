@@ -17,8 +17,8 @@ this and much more. This is the one slice we need — post a message — rebuilt
 there is no untrusted third-party dependency in the chain. The approach is
 borrowed; the code is ours.
 
-**It has no runtime dependencies at all.** Bun's built-in `fetch`, `WebSocket`
-and `spawn` cover everything, so `bun install` installs only TypeScript types.
+The release is a self-contained Java application. It requires Java 21 or later
+and uses your existing browser for sign-in.
 
 ## Quick install
 
@@ -28,38 +28,63 @@ Use your agent to help you install with this prompt:
 
 ## Install
 
-Download the latest macOS release for your Mac. Prebuilt binaries are
-self-contained; **Bun is not required**.
+Install Java 21 or later, then download the latest release jar and its checksum:
 
 ```bash
-case "$(uname -m)" in
-  arm64) asset="slack-notifier-darwin-arm64" ;; # Apple silicon
-  x86_64) asset="slack-notifier-darwin-x64" ;;  # Intel
-  *) echo "Unsupported Mac architecture: $(uname -m)" >&2; exit 1 ;;
-esac
+java -version
+mkdir -p "$HOME/.local/share/slack-notifier" &&
+curl -fL "https://github.com/robintegg-createfuture/slack-notifier/releases/latest/download/slack-notifier.jar" \
+  -o "$HOME/.local/share/slack-notifier/slack-notifier.jar" &&
+curl -fL "https://github.com/robintegg-createfuture/slack-notifier/releases/latest/download/checksums.txt" \
+  -o "$HOME/.local/share/slack-notifier/checksums.txt" &&
+(cd "$HOME/.local/share/slack-notifier" && shasum -a 256 -c checksums.txt)
+```
 
+On systems with `sha256sum` instead of `shasum`, use
+`sha256sum -c checksums.txt` in the same directory. Each release includes
+`slack-notifier.jar` and `checksums.txt`. If no release is available yet, use
+the [build from source](#build-from-source) instructions below.
+
+Run the jar directly:
+
+```bash
+java -jar "$HOME/.local/share/slack-notifier/slack-notifier.jar" --help
+```
+
+To use `slack-notifier` as a command, choose one of the following options.
+Aliases and functions work in Bash and zsh; add the chosen definition to
+`~/.bashrc` or `~/.zshrc` and reload your shell to keep it.
+
+### Alias
+
+```bash
+alias slack-notifier='java -jar "$HOME/.local/share/slack-notifier/slack-notifier.jar"'
+```
+
+### Function
+
+```bash
+slack-notifier() {
+  java -jar "$HOME/.local/share/slack-notifier/slack-notifier.jar" "$@"
+}
+```
+
+### Script
+
+For use from scripts as well as interactive shells, create a launcher:
+
+```bash
 mkdir -p "$HOME/.local/bin"
-curl -fL "https://github.com/robintegg-createfuture/slack-notifier/releases/latest/download/$asset" \
-  -o "$HOME/.local/bin/slack-notifier"
+cat > "$HOME/.local/bin/slack-notifier" <<'EOF'
+#!/usr/bin/env bash
+exec java -jar "$HOME/.local/share/slack-notifier/slack-notifier.jar" "$@"
+EOF
 chmod 755 "$HOME/.local/bin/slack-notifier"
 ```
 
-Make sure `$HOME/.local/bin` is on your `PATH`. To keep it on `PATH` in zsh,
-add this line to `~/.zshrc`:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Open a new terminal, then check the installation:
-
-```bash
-slack-notifier --help
-```
-
-Each GitHub Release includes binaries for Apple silicon (`arm64`) and Intel
-(`x64`), plus `checksums.txt`. If no release is available yet, use the
-[build from source](#build-from-source) instructions below.
+Ensure `$HOME/.local/bin` is on your `PATH`; for example, add
+`export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc` or `~/.zshrc`.
+Open a new terminal and run `slack-notifier --help`.
 
 ## Usage
 
@@ -156,11 +181,6 @@ Three guarantees that make this safe to drive unattended:
 - **`--help` never does anything.** `login --help` prints help without opening a
   browser.
 
-The specification is also the dispatch table, so a command cannot exist without
-being documented, and the test suite fails if any command is missing a
-description, an example, an option description, a `--json` shape, or a fix for a
-documented error.
-
 ### Install the agent skill
 
 Help only helps an agent that already knows this tool exists. The skill in
@@ -191,9 +211,7 @@ Remove either skill with `npx skills remove -g slack-notifier` or
 
 The `slack-notifier` skill deliberately does not restate the CLI's options or
 errors — it points at `slack-notifier help --json`, so there is one source of
-truth. A test parses its `SKILL.md` and checks every `slack-notifier …` command
-and flag it mentions against the real specification, so the skill cannot drift
-without the suite going red.
+truth.
 
 ## How the login works
 
@@ -263,32 +281,25 @@ what `auth.test` reports, and that is what `whoami` shows.
 ## Development
 
 ```bash
-bun test            # unit tests — no browser, no network
-bun run typecheck
-bun run build
+mvn verify          # compile, test, and package
 ```
 
 ### Build from source
 
-Requires [Bun](https://bun.sh) 1.4+.
+Requires JDK 21 and Maven.
 
 ```bash
-bun install
-bun run build          # -> ./dist/slack-notifier
+mvn verify             # -> target/slack-notifier.jar
+java -jar target/slack-notifier.jar --help
 ```
 
-The result is a self-contained binary for the current machine. Put it on your
-`PATH`:
+The jar includes its application dependencies. To use the installation
+examples above, copy it to the same location:
 
 ```bash
-mkdir -p ~/.local/bin
-ln -sf "$PWD/dist/slack-notifier" ~/.local/bin/slack-notifier
+mkdir -p "$HOME/.local/share/slack-notifier"
+cp target/slack-notifier.jar "$HOME/.local/share/slack-notifier/slack-notifier.jar"
 ```
-
-A symlink means a later `bun run build` updates the installed command too. Copy
-it instead if you would rather not depend on the checkout staying put.
-
-`dist/` is not committed, so a fresh clone needs `bun install && bun run build`.
 
 ### Release
 
@@ -302,26 +313,8 @@ git push origin v1
 ```
 
 Replace `v1` with the next unused tag for each release, and use the same tag in
-both commands. Pushing the tag runs the release workflow, which tests and
-typechecks the code, then publishes the macOS binaries and checksums as a
-GitHub Release.
-
-```
-src/index.ts            argv parsing, command dispatch, exit codes
-src/commands/           login, send, whoami/logout
-src/lib/help.ts         the command specification, rendered as text or JSON
-src/lib/browser.ts      browser discovery, launch, CDP connection
-src/lib/auto-login.ts   capture policy: poll until credentials are readable
-src/lib/capture.ts      pure extractors for the cookie and localConfig_v2
-src/lib/slack.ts        browser-auth request(), retry policy, error classes
-src/lib/channels.ts     channel name -> ID resolution and cache
-src/lib/config.ts       config storage and permissions
-skills/slack-notifier/  the installable agent skill
-```
-
-Anything with a rule in it is pure and unit tested — the extractors run against
-fixtures, and capture runs against a fake CDP session, so the suite needs
-neither a browser nor Slack.
+both commands. Pushing the tag runs Maven verify, smoke-tests the packaged jar,
+and publishes `slack-notifier.jar` and `checksums.txt` as a GitHub Release.
 
 ## Unaffiliated
 
