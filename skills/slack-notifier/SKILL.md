@@ -5,8 +5,8 @@ description: Post a message or notification to a named Slack channel from the co
 
 # slack-notifier
 
-A single binary that posts a message to a Slack channel. Exit code is `0` on
-success and `1` on any failure.
+A Java command-line application that posts a message to a Slack channel.
+Requires Java 21 or later. Exit code is `0` on success and `1` on failure.
 
 ## Always confirm before posting
 
@@ -85,17 +85,25 @@ for that command — each entry carries a `fix`.
 
 ## If the command is missing
 
-The binary is not committed, so a fresh checkout has none. In the
-`slack-notifier` checkout, with [Bun](https://bun.sh) 1.4+ installed:
+With Java 21 or later installed, download the latest release and install a
+launcher:
 
 ```bash
-bun install
-bun run build
-mkdir -p ~/.local/bin && ln -sf "$PWD/dist/slack-notifier" ~/.local/bin/slack-notifier
+mkdir -p "$HOME/.local/share/slack-notifier" "$HOME/.local/bin" &&
+curl -fL "https://github.com/robintegg-createfuture/slack-notifier/releases/latest/download/slack-notifier.jar" \
+  -o "$HOME/.local/share/slack-notifier/slack-notifier.jar" &&
+curl -fL "https://github.com/robintegg-createfuture/slack-notifier/releases/latest/download/checksums.txt" \
+  -o "$HOME/.local/share/slack-notifier/checksums.txt" &&
+(cd "$HOME/.local/share/slack-notifier" && shasum -a 256 -c checksums.txt) &&
+cat > "$HOME/.local/bin/slack-notifier" <<'EOF' &&
+#!/usr/bin/env bash
+exec java -jar "$HOME/.local/share/slack-notifier/slack-notifier.jar" "$@"
+EOF
+chmod 755 "$HOME/.local/bin/slack-notifier"
 ```
 
-Confirm `~/.local/bin` is on `PATH`. If the checkout is not on this machine,
-say so and stop rather than guessing at a location.
+Confirm `~/.local/bin` is on `PATH` and run `slack-notifier help`. See the
+repository README for checksum verification alternatives and building from source.
 
 ## Notes
 
